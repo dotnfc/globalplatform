@@ -19,25 +19,27 @@ IF(DEBUG)
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0 -Wall")
   ENDIF()
 
-  # check for fsanitize support
-  CMAKE_PUSH_CHECK_STATE()
-  SET(CMAKE_REQUIRED_FLAGS "-fsanitize=address")
-  check_c_compiler_flag("-fsanitize=address" FSANITIZE)
-  CMAKE_POP_CHECK_STATE()
-  IF(FSANITIZE)
-  MESSAGE("fsanitize supported")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-  ENDIF()
-  
-  # check for Wpedantic support
-  CMAKE_PUSH_CHECK_STATE()
-  SET(CMAKE_REQUIRED_FLAGS "-Wpedantic")
-  check_c_compiler_flag("-Wpedantic" PEDANTIC)
-  CMAKE_POP_CHECK_STATE()
-  IF(PEDANTIC)
-  MESSAGE("pedantic supported")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
-  ENDIF()
+  IF(NOT _STATIC)
+	  # check for fsanitize support
+	  CMAKE_PUSH_CHECK_STATE()
+	  SET(CMAKE_REQUIRED_FLAGS "-fsanitize=address")
+	  check_c_compiler_flag("-fsanitize=address" FSANITIZE)
+	  CMAKE_POP_CHECK_STATE()
+	  IF(FSANITIZE)
+	  MESSAGE("fsanitize supported")
+	  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+	  ENDIF()
+	  
+	  # check for Wpedantic support
+	  CMAKE_PUSH_CHECK_STATE()
+	  SET(CMAKE_REQUIRED_FLAGS "-Wpedantic")
+	  check_c_compiler_flag("-Wpedantic" PEDANTIC)
+	  CMAKE_POP_CHECK_STATE()
+	  IF(PEDANTIC)
+	  MESSAGE("pedantic supported")
+	  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
+	  ENDIF()
+  ENDIF(NOT _STATIC)
   
 ELSE(DEBUG)
   SET(CMAKE_BUILD_TYPE "Release")
@@ -158,6 +160,11 @@ IF(TESTING)
         SOURCES scp01Test.c testUtil.c ${SOURCES}
         MOCKS RAND_bytes
         LINK_LIBRARIES ${LIBRARIES})
+
+      add_mocked_test(utilTest
+        SOURCES utilTest.c testUtil.c ${SOURCES}
+        LINK_LIBRARIES ${LIBRARIES})
+
     ELSE()
 	  MESSAGE("--wrap linker flag not supported, not executing tests.")
     ENDIF()

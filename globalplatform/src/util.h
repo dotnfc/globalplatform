@@ -65,7 +65,7 @@ DWORD get_number(PBYTE buf, DWORD offset, BYTE numLength);
 
 //! \brief Parse the APDU case.
 OPGP_NO_API
-LONG parse_apdu_case(PBYTE apduCommand, DWORD apduCommandLength, PBYTE caseAPDU, PBYTE lc, PBYTE le);
+LONG parse_apdu_case(PBYTE apduCommand, DWORD apduCommandLength, PBYTE caseAPDU, PDWORD lc, PDWORD le);
 
 #ifdef __cplusplus
 }

@@ -296,9 +296,9 @@ OPGP_ERROR_STATUS OPGP_PL_send_APDU(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INF
 
 	DWORD result = SCARD_S_SUCCESS;
 	BYTE caseAPDU = 0;
-	BYTE lc = 0;
-	BYTE le = 0;
-	BYTE la = 0;
+	DWORD lc = 0;
+	DWORD le = 0;
+	DWORD la = 0;
 
 	DWORD offset = 0;
 
@@ -308,8 +308,8 @@ OPGP_ERROR_STATUS OPGP_PL_send_APDU(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INF
 
 	OPGP_LOG_START(_T("OPGP_PL_send_APDU"));
 	CHECK_CARD_CONTEXT_INITIALIZATION(cardContext, status)
-		CHECK_CARD_INFO_INITIALIZATION(cardInfo, status)
-		responseData = (PBYTE)malloc(sizeof(BYTE)*responseDataLength);
+	CHECK_CARD_INFO_INITIALIZATION(cardInfo, status)
+	responseData = (PBYTE)malloc(sizeof(BYTE)*responseDataLength);
 	if (responseData == NULL) {
 		result = ENOMEM;
 		HANDLE_STATUS(status, result);
@@ -343,6 +343,39 @@ OPGP_ERROR_STATUS OPGP_PL_send_APDU(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INF
 		if (caseAPDU == 4) {
 			capduLength--;
 		}
+		// ISO 7816-3 12.2.6 Case 2E
+		else if (caseAPDU == 0x2e) {
+			capduLength-=2;
+			if (le <= 256) {
+				capdu[4] = le;
+			}
+			else {
+				capdu[4] = 0;
+			}
+		}
+		// ISO 7816-3 12.2.7 Case 3E
+		else if (caseAPDU == 0x3e) {
+			if (lc < 256) {
+				capdu[4] = lc;
+				memmove(capdu+5, capdu+7, lc);
+			}
+			else {
+				// TODO: create several ENVELOPE commands
+				capdu[4] = 0;
+			}
+		}
+		// ISO 7816-3 12.2.7 Case 4E
+		else if (caseAPDU == 0x4e) {
+			capduLength-=2;
+			if (lc < 256) {
+				capdu[4] = lc;
+				memmove(capdu+5, capdu+7, lc);
+			}
+			else {
+				// TODO: create several ENVELOPE commands
+				capdu[4] = 0;
+			}
+		}
 
 		// T=0 transmission (first command)
 
@@ -363,7 +396,8 @@ OPGP_ERROR_STATUS OPGP_PL_send_APDU(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INF
 		// main switch block for cases 2 and 4
 
 		switch (caseAPDU) {
-		case 2: {
+		case 2:
+		case 0x2e: {
 
 			while ((responseData[offset] == 0x61)
 				|| (responseData[offset] == 0x6c)) {
@@ -467,7 +501,8 @@ OPGP_ERROR_STATUS OPGP_PL_send_APDU(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INF
 			break;
 				} // case 2
 
-		case 4: {
+		case 4:
+		case 0x4e: {
 
 			/* Note: Some smartcard are not fully compatible
 			with ISO normatives in case short 4.
@@ -491,9 +526,13 @@ OPGP_ERROR_STATUS OPGP_PL_send_APDU(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INF
 					capdu[3] = 0x00; // P2
 					capduLength = 5;
 
+					if (caseAPDU == 0x4e && responseData[offset] == 0x90 && le > 256) {
+						// ISO 7816-3 case 4e.1 b)
+						capdu[4] = 0;
+					} else {
 					// Default Case Le is requested in the get response
-
-					capdu[4] = le; // P3
+						capdu[4] = le; // P3
+					}
 
 					// verify if we have La < Le in the case of sw2 = 0x61 or 0x9f
 

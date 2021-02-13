@@ -1469,7 +1469,7 @@ end:
  */
 OPGP_ERROR_STATUS wrap_command(PBYTE apduCommand, DWORD apduCommandLength, PBYTE wrappedApduCommand, PDWORD wrappedApduCommandLength, GP211_SECURITY_INFO *secInfo) {
 	OPGP_ERROR_STATUS status;
-	BYTE lc = 0, le =0 ;
+	DWORD lc = 0, le =0 ;
 	DWORD wrappedLength;
 	BYTE mac[16]; // only first 8 bytes used by SCP01/02
 	// 8 bytes reserved for MAC
@@ -1508,6 +1508,8 @@ OPGP_ERROR_STATUS wrap_command(PBYTE apduCommand, DWORD apduCommandLength, PBYTE
 		case 4:
 			wrappedLength = lc + 5;
 			break;
+		default:
+		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_UNRECOGNIZED_APDU_COMMAND, OPGP_stringify_error(OPGP_ERROR_UNRECOGNIZED_APDU_COMMAND)); goto end; }
 	}
 
 	/*
@@ -1827,9 +1829,9 @@ OPGP_ERROR_STATUS GP211_calculate_R_MAC(PBYTE apduCommand, DWORD apduCommandLeng
 	if (secInfo->secureChannelProtocol == GP211_SCP02) {
 		DWORD r_MacDataLength = sizeof(r_MacData);
 		BYTE caseAPDU;
-		BYTE lc;
-		BYTE le;
-		if (parse_apdu_case(apduCommand, apduCommandLength, &caseAPDU, &lc, &le)) {
+		DWORD lc;
+		DWORD le;
+		if (parse_apdu_case(apduCommand, apduCommandLength, &caseAPDU, &lc, &le) || lc > 4) {
 			{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_UNRECOGNIZED_APDU_COMMAND, OPGP_stringify_error(OPGP_ERROR_UNRECOGNIZED_APDU_COMMAND)); goto end; }
 		}
 		memcpy(r_MacData, apduCommand, 4);

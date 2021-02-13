@@ -13,25 +13,27 @@ IF(DEBUG)
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0 -Wall")
   ENDIF()
 
-  # check for fsanitize support
-  CMAKE_PUSH_CHECK_STATE()
-  SET(CMAKE_REQUIRED_FLAGS "-fsanitize=address")
-  check_c_compiler_flag("-fsanitize=address" FSANITIZE)
-  CMAKE_POP_CHECK_STATE()
-  IF(FSANITIZE)
-  MESSAGE("fsanitize supported")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-  ENDIF()
-  
-  # check for Wpedantic support
-  CMAKE_PUSH_CHECK_STATE()
-  SET(CMAKE_REQUIRED_FLAGS "-Wpedantic")
-  check_c_compiler_flag("-Wpedantic" PEDANTIC)
-  CMAKE_POP_CHECK_STATE()
-  IF(PEDANTIC)
-  MESSAGE("pedantic supported")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
-  ENDIF()
+  IF(NOT _STATIC)
+	  # check for fsanitize support
+	  CMAKE_PUSH_CHECK_STATE()
+	  SET(CMAKE_REQUIRED_FLAGS "-fsanitize=address")
+	  check_c_compiler_flag("-fsanitize=address" FSANITIZE)
+	  CMAKE_POP_CHECK_STATE()
+	  IF(FSANITIZE)
+	  MESSAGE("fsanitize supported")
+	  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+	  ENDIF()
+	  
+	  # check for Wpedantic support
+	  CMAKE_PUSH_CHECK_STATE()
+	  SET(CMAKE_REQUIRED_FLAGS "-Wpedantic")
+	  check_c_compiler_flag("-Wpedantic" PEDANTIC)
+	  CMAKE_POP_CHECK_STATE()
+	  IF(PEDANTIC)
+	  MESSAGE("pedantic supported")
+	  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
+	  ENDIF()
+  ENDIF(NOT _STATIC)
   
 ELSE(DEBUG)
   SET(CMAKE_BUILD_TYPE "Release")
@@ -55,11 +57,19 @@ IF(UNIX)
   link_directories(${PCSC_LIBDIR})
 ENDIF()
 
+ADD_LIBRARY(gppcscconnectionpluginStatic STATIC ${SOURCES})
 ADD_LIBRARY(gppcscconnectionplugin SHARED ${SOURCES})
-TARGET_LINK_LIBRARIES(gppcscconnectionplugin ${GLOBALPLATFORM_LIBRARIES} ${PCSC_LIBRARIES})
+
+# Under Unix shared and static libraries can have the same name
+IF(UNIX)
+  SET_TARGET_PROPERTIES(gppcscconnectionpluginStatic PROPERTIES OUTPUT_NAME gppcscconnectionplugin)
+  SET(LIBRARIES ${LIBRARIES} dl)
+ENDIF(UNIX)
+
+TARGET_LINK_LIBRARIES(gppcscconnectionplugin gppcscconnectionpluginStatic ${GLOBALPLATFORM_LIBRARIES} ${PCSC_LIBRARIES})
 
 IF(WINDDK_DIR)
-  TARGET_LINK_LIBRARIES(gppcscconnectionplugin ${GLOBALPLATFORM_LIBRARIES} ${PCSC_LIBRARIES} optimized ${WINDDK_DIR}/lib/win7/i386/msvcrt_win2000.obj optimized ${WINDDK_DIR}/lib/Crt/i386/msvcrt.lib)
+  TARGET_LINK_LIBRARIES(gppcscconnectionplugin gppcscconnectionpluginStatic ${GLOBALPLATFORM_LIBRARIES} ${PCSC_LIBRARIES} optimized ${WINDDK_DIR}/lib/win7/i386/msvcrt_win2000.obj optimized ${WINDDK_DIR}/lib/Crt/i386/msvcrt.lib)
 ENDIF(WINDDK_DIR)
 
 IF(UNIX)
@@ -72,9 +82,11 @@ ENDIF(WIN32)
 
 # Install
 IF(WIN32)
+ INSTALL(TARGETS gppcscconnectionpluginStatic ARCHIVE DESTINATION lib${LIB_SUFFIX} COMPONENT dev)
  INSTALL(TARGETS gppcscconnectionplugin RUNTIME DESTINATION lib${LIB_SUFFIX})
  INSTALL(TARGETS gppcscconnectionplugin ARCHIVE DESTINATION lib${LIB_SUFFIX})
 ELSE(WIN32)
+ INSTALL(TARGETS gppcscconnectionpluginStatic ARCHIVE DESTINATION lib${LIB_SUFFIX} COMPONENT dev)
  INSTALL(TARGETS gppcscconnectionplugin LIBRARY DESTINATION lib${LIB_SUFFIX})
 ENDIF(WIN32)
 

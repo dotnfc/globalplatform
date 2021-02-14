@@ -40,6 +40,8 @@
 
 #define CHECK_CARD_INFO_INITIALIZATION(cardInfo, status)	if (cardInfo.librarySpecific == NULL) { OPGP_ERROR_CREATE_ERROR(status, OPGP_PL_ERROR_NO_CARD_INFO_INITIALIZED, OPGP_PL_stringify_error(OPGP_PL_ERROR_NO_CARD_INFO_INITIALIZED)); goto end;}
 
+#define MIN(a,b) a < b ? a : b
+
 /**
 * Handles the error status for the result.
 */
@@ -353,48 +355,64 @@ OPGP_ERROR_STATUS OPGP_PL_send_APDU(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INF
 				capdu[4] = 0;
 			}
 		}
-		// ISO 7816-3 12.2.7 Case 3E
-		else if (caseAPDU == 0x3e) {
+		// ISO 7816-3 12.2.7 Case 3E and Case 4E
+		else if (caseAPDU == 0x3e || caseAPDU == 0x4e) {
+			if (caseAPDU == 0x4e) {
+				capduLength-=2;
+			}
 			if (lc < 256) {
 				capdu[4] = lc;
 				memmove(capdu+5, capdu+7, lc);
 			}
 			else {
-				// TODO: create several ENVELOPE commands
+				BYTE envelope[262 + 5] = {0};
+				DWORD capduOffset = 0;
 				capdu[4] = 0;
-			}
-		}
-		// ISO 7816-3 12.2.7 Case 4E
-		else if (caseAPDU == 0x4e) {
-			capduLength-=2;
-			if (lc < 256) {
-				capdu[4] = lc;
-				memmove(capdu+5, capdu+7, lc);
-			}
-			else {
-				// TODO: create several ENVELOPE commands
-				capdu[4] = 0;
+				envelope[1] = 0xC2;
+				while (capduOffset < capduLength) {
+					DWORD commandLength = MIN(255, capduLength - capduOffset);
+					memcpy(envelope+5, capdu+capduOffset, commandLength);
+					capdu[4] = commandLength;
+					result = SCardTransmit(GET_PCSC_CARD_INFO_SPECIFIC(cardInfo)->cardHandle,
+												SCARD_PCI_T0,
+												envelope,
+												commandLength+5,
+												NULL,
+												responseData,
+												&responseDataLength
+												);
+					if ( SCARD_S_SUCCESS != result) {
+						HANDLE_STATUS(status, result);
+						goto end;
+					}
+					capduOffset+=commandLength;
+					if (responseData[responseDataLength-2] != 0x90 && responseData[responseDataLength-1] != 0x00) {
+						break;
+					}
+				}
 			}
 		}
 
-		// T=0 transmission (first command)
+		if (caseAPDU != 0x3e && caseAPDU != 0x4e) {
+			// T=0 transmission (first command)
 
-		responseDataLength = *rapduLength;
-		result = SCardTransmit(GET_PCSC_CARD_INFO_SPECIFIC(cardInfo)->cardHandle,
-			SCARD_PCI_T0,
-			capdu,
-			capduLength,
-			NULL,
-			responseData,
-			&responseDataLength
-			);
-		if ( SCARD_S_SUCCESS != result) {
-			HANDLE_STATUS(status, result);
-			goto end;
-		} // if ( SCARD_S_SUCCESS != result)
-		offset += responseDataLength - 2;
+			responseDataLength = *rapduLength;
+			result = SCardTransmit(GET_PCSC_CARD_INFO_SPECIFIC(cardInfo)->cardHandle,
+				SCARD_PCI_T0,
+				capdu,
+				capduLength,
+				NULL,
+				responseData,
+				&responseDataLength
+				);
+			if ( SCARD_S_SUCCESS != result) {
+				HANDLE_STATUS(status, result);
+				goto end;
+			} // if ( SCARD_S_SUCCESS != result)
+			offset += responseDataLength - 2;
+		}
+
 		// main switch block for cases 2 and 4
-
 		switch (caseAPDU) {
 		case 2:
 		case 0x2e: {
